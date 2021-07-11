@@ -1,3 +1,5 @@
+const { DriverService } = require("selenium-webdriver/remote");
+
 /**
  * Script replicates the manual way of refreshing a
  * ServiceNow developer instance. I know, I'm lazy.
@@ -5,14 +7,15 @@
 (async () => {
   // load dependencies
   require("dotenv").config();
-  const { Builder, By, Key, until } = require("selenium-webdriver");
+  require("geckodriver");
+  const { Builder, By, Key, until, WebElement } = require("selenium-webdriver");
   const chrome = require("selenium-webdriver/chrome");
   const firefox = require("selenium-webdriver/firefox");
 
   // Set default screen resolution (for headless instance)
   const screenResolution = {
     width: 1280,
-    height: 720
+    height: 720,
   };
 
   // Set config variables
@@ -37,59 +40,81 @@
 
   // Refreshing of instance starts here.
   try {
-    // Go to servicenow
-    console.log('Redirecting to https://developer.servicenow.com/');
-    await driver.get("https://developer.servicenow.com/");
-
-    // click login link
-    console.log('Logging in..');
-    await driver.findElement(By.id("dp-hdr-login-link")).click();
-
+    // Go to servicenow login page
+    writeToLog(">>> Redirecting to https://developer.servicenow.com/ssologin.do?relayState=%2Fdev.do%23%21%2Fhome");
+    await driver.get(
+      "https://developer.servicenow.com/ssologin.do?relayState=%2Fdev.do%23%21%2Fhome"
+    );
     // enter username
+    writeToLog(">>> Setting username...");
     await driver
       .findElement(By.id("username"))
       .sendKeys(`${process.env.EMAIL}`);
 
     // click next
+    writeToLog(">>> Submit username...");
     await driver.findElement(By.id("usernameSubmitButton")).click();
 
     // enter password
+    writeToLog(">>> Waiting for password field to appear...");
     let pwd = driver.wait(until.elementLocated(By.id("password")), 5000);
     await driver
       .wait(until.elementIsVisible(pwd), 5000)
       .sendKeys(`${process.env.PASSWORD}`);
 
     // click sign in
+    writeToLog(">>> Find submit button");
     let signInBtn = driver.wait(
       until.elementLocated(By.id("submitButton")),
       5000
     );
     await driver.wait(until.elementIsVisible(signInBtn), 5000).click();
+    writeToLog(">>> Clicked submit button");
 
     // wait for 30 secs to ensure sign in is done
+    writeToLog(">>> Wait 30 secs for signing in");
     await driver.wait(
-      until.titleIs("Dashboard | ServiceNow Developers"),
+      // Title found from <head>
+      until.titleIs("Home | ServiceNow Developers"),
       30000
     );
 
-    // go to instances
-    console.log('Checking your instance...');
-    await driver.get("https://developer.servicenow.com/app.do#!/instance");
+    // Pause for a bit before trying to get the wakeup button
+    writeToLog(">>> Pause for 10 secs before finding the Start building button");
+    await new Promise(resolve => setTimeout(resolve, 10000));
 
-    // wake up instance
-    let wakeInstanceBtn = driver.wait(
-      until.elementLocated(By.id("instanceWakeUpBtn")),
-      5000
-    );
-
-    console.log('Waking your instance up!');
-    await driver.wait(until.elementIsVisible(wakeInstanceBtn), 5000).click();
-  } catch (e) {
-
+    
+    // Try to wake up instance
+    writeToLog(">>> Try to locate Start building button");
+    try {
+      let wakeInstanceBtn = driver.wait(
+        // This spaghetti element selector is due to SN Developer page is filled with Shadow Root elements
+        until.elementLocated(
+          By.js(
+            'return document.querySelector("body > dps-app").shadowRoot.querySelector("div > main > dps-home-auth-quebec").shadowRoot.querySelector("div > section:nth-child(1) > div > dps-page-header > div:nth-child(1) > button")'
+          )
+        ),
+        30000
+      );
+      writeToLog(">>> Waking your instance up!");
+      await driver.wait(until.elementIsVisible(wakeInstanceBtn), 30000).click();
+      writeToLog(">>> Clicked wake instance button");
+    } catch (err) {
+      writeToLog(">>> ERROR wakeInstanceBtn >> " + err);
+    }
+  } catch (err) {
+    writeToLog(">>> ERROR >> " + err);
   } finally {
     // Wait 5 minutes before terminating Selenium
     setTimeout(async () => {
       await driver.quit();
     }, 300000);
+    writeToLog(">>> TERMINATING");
   }
 })();
+
+function writeToLog(message) {
+  console.log(
+    new Date().toISOString().replace(/[TZ]/g, " ") + message
+  );
+}
