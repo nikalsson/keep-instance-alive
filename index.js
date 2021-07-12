@@ -41,7 +41,9 @@ const { DriverService } = require("selenium-webdriver/remote");
   // Refreshing of instance starts here.
   try {
     // Go to servicenow login page
-    writeToLog(">>> Redirecting to https://developer.servicenow.com/ssologin.do?relayState=%2Fdev.do%23%21%2Fhome");
+    writeToLog(
+      ">>> Redirecting to https://developer.servicenow.com/ssologin.do?relayState=%2Fdev.do%23%21%2Fhome"
+    );
     await driver.get(
       "https://developer.servicenow.com/ssologin.do?relayState=%2Fdev.do%23%21%2Fhome"
     );
@@ -80,27 +82,45 @@ const { DriverService } = require("selenium-webdriver/remote");
     );
 
     // Pause for a bit before trying to get the wakeup button
-    writeToLog(">>> Pause for 10 secs before finding the Start building button");
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    writeToLog(
+      ">>> Pause for 10 secs before trying to find waking up instance text"
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
-    
-    // Try to wake up instance
-    writeToLog(">>> Try to locate Start building button");
     try {
-      let wakeInstanceBtn = driver.wait(
-        // This spaghetti element selector is due to SN Developer page is filled with Shadow Root elements
+      // Check if the "Waking up instance is present"
+      let wakingUp = driver.wait(
         until.elementLocated(
           By.js(
-            'return document.querySelector("body > dps-app").shadowRoot.querySelector("div > main > dps-home-auth-quebec").shadowRoot.querySelector("div > section:nth-child(1) > div > dps-page-header > div:nth-child(1) > button")'
+            'return document.querySelector("body > dps-app").shadowRoot.querySelector("div > main > dps-home-auth-quebec").shadowRoot.querySelector("div > section:nth-child(1) > div > dps-page-header > div:nth-child(2) > div > p")'
           )
         ),
-        30000
+        10000
       );
-      writeToLog(">>> Waking your instance up!");
-      await driver.wait(until.elementIsVisible(wakeInstanceBtn), 30000).click();
-      writeToLog(">>> Clicked wake instance button");
+
+      // Wait until Waking up text disappears, up to 10 mins
+      await driver.wait(until.stalenessOf(wakingUp), 600000);
     } catch (err) {
-      writeToLog(">>> ERROR wakeInstanceBtn >> " + err);
+      writeToLog(">>> ERROR wakingUp >>" + err);
+    } finally {
+      // The text might not be present, try to find the Start building button    
+      writeToLog(">>> Try to locate Start building button");
+      try {
+        let wakeInstanceBtn = driver.wait(
+          // This spaghetti element selector is due to SN Developer page is filled with Shadow Root elements
+          until.elementLocated(
+            By.js(
+              'return document.querySelector("body > dps-app").shadowRoot.querySelector("div > main > dps-home-auth-quebec").shadowRoot.querySelector("div > section:nth-child(1) > div > dps-page-header > div:nth-child(1) > button")'
+            )
+          ),
+          30000
+        );
+        writeToLog(">>> Waking your instance up!");
+        await driver.wait(until.elementIsVisible(wakeInstanceBtn), 30000).click();
+        writeToLog(">>> Clicked wake instance button");
+      } catch (err) {
+        writeToLog(">>> ERROR wakeInstanceBtn >> " + err);
+      }
     }
   } catch (err) {
     writeToLog(">>> ERROR >> " + err);
@@ -114,7 +134,5 @@ const { DriverService } = require("selenium-webdriver/remote");
 })();
 
 function writeToLog(message) {
-  console.log(
-    new Date().toISOString().replace(/[TZ]/g, " ") + message
-  );
+  console.log(new Date().toISOString().replace(/[TZ]/g, " ") + message);
 }
