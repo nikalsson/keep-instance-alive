@@ -76,8 +76,8 @@ const { DriverService } = require("selenium-webdriver/remote");
     // wait for 30 secs to ensure sign in is done
     writeToLog(">>> Wait 30 secs for signing in");
     await driver.wait(
-      // Title found from <head>
-      until.titleIs("Home | ServiceNow Developers"),
+      // Title found from <head>, changed from "Home | ServiceNow Developers" to "ServiceNow Developers"
+      until.titleIs("ServiceNow Developers"),
       30000
     );
 
